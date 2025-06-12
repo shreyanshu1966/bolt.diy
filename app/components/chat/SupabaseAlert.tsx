@@ -47,11 +47,18 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
           const trimmedStatement = statement.trim();
 
           if (trimmedStatement) {
-            // For managed instance, execute SQL directly
-            const { error } = await managedSupabase.rpc('exec_sql', { query: trimmedStatement });
+            // For managed instance, execute SQL using the correct function name
+            const { data, error } = await managedSupabase.rpc('sql', { query: trimmedStatement });
 
             if (error) {
-              throw error;
+              console.error('SQL execution error:', error);
+              throw new Error(`SQL Error: ${error.message}`);
+            }
+
+            // Check if the function returned an error in the data
+            if (data && typeof data === 'object' && data.error) {
+              console.error('SQL function returned error:', data);
+              throw new Error(`SQL Error: ${data.message || 'Unknown database error'}`);
             }
           }
         }
