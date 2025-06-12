@@ -22,31 +22,82 @@ export async function action({ request, context }: ActionFunctionArgs) {
       // Use managed Supabase instance
       logger.debug('Using managed Supabase instance');
 
-      const supabase = createClient(managedSupabaseUrl, managedSupabaseServiceKey);
-      const result = await supabase.rpc('execute_sql', { sql: query });
+      try {
+        // Create supabase client with service role key for admin operations
+        const supabase = createClient(managedSupabaseUrl, managedSupabaseServiceKey);
 
-      if (result.error) {
+        // Try to execute the query using the sql function
+        const result = await supabase.rpc('sql', { query });
+
+        if (result.error) {
+          // Log the specific error for debugging
+          logger.error('SQL function error:', result.error);
+
+          // If it's a function not found error, provide a helpful message
+          if (
+            result.error.code === '42883' ||
+            result.error.message?.includes('function') ||
+            result.error.message?.includes('does not exist')
+          ) {
+            return new Response(
+              JSON.stringify({
+                error: {
+                  message: 'Database functions not set up. Please run the setup commands in your Supabase dashboard.',
+                  setup_required: true,
+                  instructions:
+                    'Go to your Supabase dashboard > SQL Editor and run the commands from: docs/SUPABASE_FUNCTIONS_SETUP.md',
+                  details: result.error,
+                },
+              }),
+              {
+                status: 500,
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              },
+            );
+          }
+
+          // For other errors, return them directly
+          return new Response(
+            JSON.stringify({
+              error: {
+                message: result.error.message || 'Query execution failed',
+                details: result.error,
+              },
+            }),
+            {
+              status: 400,
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            },
+          );
+        }
+
+        return new Response(JSON.stringify(result), {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (error) {
+        logger.error('Managed Supabase query error:', error);
+
         return new Response(
           JSON.stringify({
             error: {
-              message: result.error.message,
-              details: result.error,
+              message: error instanceof Error ? error.message : 'Query execution failed',
+              details: error,
             },
           }),
           {
-            status: 400,
+            status: 500,
             headers: {
               'Content-Type': 'application/json',
             },
           },
         );
       }
-
-      return new Response(JSON.stringify(result), {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
     }
 
     // Fallback to user-provided Supabase (existing logic)

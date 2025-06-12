@@ -80,6 +80,14 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
 
         if (!response.ok) {
           const errorData = (await response.json()) as any;
+
+          // Check if it's a setup issue
+          if (errorData.error?.setup_required) {
+            throw new Error(
+              `Setup required: ${errorData.error.message}\n\nPlease run the SQL commands from docs/SUPABASE_FUNCTIONS_SETUP.md in your Supabase dashboard.`,
+            );
+          }
+
           throw new Error(`Supabase query failed: ${errorData.error?.message || response.statusText}`);
         }
 

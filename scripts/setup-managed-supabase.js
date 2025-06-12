@@ -84,12 +84,14 @@ VITE_SUPABASE_ANON_KEY=${anonKey}
 
   // Write to file
   fs.writeFileSync(envPath, envContent);
-
   console.log('\n✅ Successfully configured managed Supabase!');
   console.log('\n🔧 Next steps:');
   console.log('1. Restart your development server');
-  console.log('2. Set up Row Level Security (RLS) on your Supabase tables');
-  console.log('3. Create necessary database functions (see docs/MANAGED_SUPABASE.md)');
+  console.log('2. Set up required SQL functions in your Supabase database:');
+  console.log('   Open your Supabase dashboard > SQL Editor');
+  console.log('   Copy and run the SQL from: docs/SUPABASE_FUNCTIONS_SETUP.md');
+  console.log('3. Enable Row Level Security (RLS) on your Supabase tables');
+  console.log('4. Test with: npm run test:supabase');
   console.log('\n🎉 Users can now create database-powered apps without any setup!');
   
   rl.close();
