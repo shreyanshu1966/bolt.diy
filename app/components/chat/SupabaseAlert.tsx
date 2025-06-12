@@ -4,6 +4,7 @@ import { classNames } from '~/utils/classNames';
 import { supabaseConnection } from '~/lib/stores/supabase';
 import { useStore } from '@nanostores/react';
 import { useState } from 'react';
+import { HAS_MANAGED_SUPABASE, managedSupabase } from '~/lib/supabase/managed-client';
 
 interface Props {
   alert: SupabaseAlert;
@@ -17,8 +18,8 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
   const [isExecuting, setIsExecuting] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
 
-  // Determine connection state
-  const isConnected = !!(connection.token && connection.selectedProjectId);
+  // Determine connection state - managed instance is always "connected"
+  const isConnected = HAS_MANAGED_SUPABASE || !!(connection.token && connection.selectedProjectId);
 
   // Set title and description based on connection state
   const title = isConnected ? 'Supabase Query' : 'Supabase Connection Required';
@@ -34,36 +35,58 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
 
   // Determine if we should show the Connect button or Apply Changes button
   const showConnectButton = !isConnected;
-
   const executeSupabaseAction = async (sql: string) => {
-    if (!connection.token || !connection.selectedProjectId) {
-      console.error('No Supabase token or project selected');
-      return;
-    }
-
     setIsExecuting(true);
 
     try {
-      const response = await fetch('/api/supabase/query', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${connection.token}`,
-        },
-        body: JSON.stringify({
-          projectId: connection.selectedProjectId,
-          query: sql,
-        }),
-      });
+      if (HAS_MANAGED_SUPABASE && managedSupabase) {
+        // Execute directly using the managed Supabase client
+        const statements = sql.split(';').filter((stmt) => stmt.trim().length > 0);
 
-      if (!response.ok) {
-        const errorData = (await response.json()) as any;
-        throw new Error(`Supabase query failed: ${errorData.error?.message || response.statusText}`);
+        for (const statement of statements) {
+          const trimmedStatement = statement.trim();
+
+          if (trimmedStatement) {
+            // For managed instance, execute SQL directly
+            const { error } = await managedSupabase.rpc('exec_sql', { query: trimmedStatement });
+
+            if (error) {
+              throw error;
+            }
+          }
+        }
+
+        console.log('Managed Supabase query executed successfully');
+        clearAlert();
+        postMessage('✅ Database schema updated successfully!');
+      } else {
+        // Use the existing API for user-provided Supabase instances
+        if (!connection.token || !connection.selectedProjectId) {
+          console.error('No Supabase token or project selected');
+          return;
+        }
+
+        const response = await fetch('/api/supabase/query', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${connection.token}`,
+          },
+          body: JSON.stringify({
+            projectId: connection.selectedProjectId,
+            query: sql,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = (await response.json()) as any;
+          throw new Error(`Supabase query failed: ${errorData.error?.message || response.statusText}`);
+        }
+
+        const result = await response.json();
+        console.log('Supabase query executed successfully:', result);
+        clearAlert();
       }
-
-      const result = await response.json();
-      console.log('Supabase query executed successfully:', result);
-      clearAlert();
     } catch (error) {
       console.error('Failed to execute Supabase action:', error);
       postMessage(

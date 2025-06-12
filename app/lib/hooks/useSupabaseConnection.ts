@@ -10,6 +10,7 @@ import {
   updateSupabaseConnection,
   fetchProjectApiKeys,
 } from '~/lib/stores/supabase';
+import { HAS_MANAGED_SUPABASE } from '~/lib/supabase/managed-client';
 
 export function useSupabaseConnection() {
   const connection = useStore(supabaseConnection);
@@ -20,6 +21,47 @@ export function useSupabaseConnection() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
+    // If using managed instance, simulate a connected state
+    if (HAS_MANAGED_SUPABASE) {
+      updateSupabaseConnection({
+        user: {
+          id: 'managed',
+          email: 'managed@bolt.diy',
+          role: 'admin',
+          created_at: new Date().toISOString(),
+          last_sign_in_at: new Date().toISOString(),
+        },
+        token: 'managed',
+        stats: {
+          projects: [
+            {
+              id: 'managed',
+              name: 'Managed Instance',
+              organization_id: 'bolt-diy',
+              region: 'us-east-1',
+              created_at: new Date().toISOString(),
+              status: 'active',
+            },
+          ],
+          totalProjects: 1,
+        },
+        selectedProjectId: 'managed',
+        project: {
+          id: 'managed',
+          name: 'Managed Instance',
+          organization_id: 'bolt-diy',
+          region: 'us-east-1',
+          created_at: new Date().toISOString(),
+          status: 'active',
+        },
+        credentials: {
+          anonKey: process.env.SUPABASE_ANON_KEY || '',
+          supabaseUrl: process.env.SUPABASE_URL || '',
+        },
+      });
+      return;
+    }
+
     const savedConnection = localStorage.getItem('supabase_connection');
     const savedCredentials = localStorage.getItem('supabaseCredentials');
 
@@ -39,6 +81,11 @@ export function useSupabaseConnection() {
   }, []);
 
   const handleConnect = async () => {
+    // Skip connection for managed instance as it's already connected
+    if (HAS_MANAGED_SUPABASE) {
+      return true;
+    }
+
     isConnecting.set(true);
 
     try {
@@ -82,8 +129,12 @@ export function useSupabaseConnection() {
       isConnecting.set(false);
     }
   };
-
   const handleDisconnect = () => {
+    // Skip disconnection for managed instance
+    if (HAS_MANAGED_SUPABASE) {
+      return;
+    }
+
     updateSupabaseConnection({ user: null, token: '' });
     toast.success('Disconnected from Supabase');
     setIsDropdownOpen(false);
@@ -135,7 +186,7 @@ export function useSupabaseConnection() {
     selectProject,
     handleCreateProject,
     updateToken: (token: string) => updateSupabaseConnection({ ...connection, token }),
-    isConnected: !!(connection.user && connection.token),
+    isConnected: HAS_MANAGED_SUPABASE || !!(connection.user && connection.token),
     fetchProjectApiKeys: (projectId: string) => {
       if (connection.token) {
         return fetchProjectApiKeys(projectId, connection.token);

@@ -1,22 +1,60 @@
 import { type ActionFunctionArgs } from '@remix-run/cloudflare';
 import { createScopedLogger } from '~/utils/logger';
+import { createClient } from '@supabase/supabase-js';
 
 const logger = createScopedLogger('api.supabase.query');
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 });
-  }
-
-  const authHeader = request.headers.get('Authorization');
-
-  if (!authHeader) {
-    return new Response('No authorization token provided', { status: 401 });
   }
 
   try {
     const { projectId, query } = (await request.json()) as any;
     logger.debug('Executing query:', { projectId, query });
+
+    // Check if we have managed Supabase configuration
+    const env = context?.cloudflare?.env || process.env;
+    const managedSupabaseUrl = env.SUPABASE_URL;
+    const managedSupabaseServiceKey = env.SUPABASE_SERVICE_KEY;
+
+    if (managedSupabaseUrl && managedSupabaseServiceKey) {
+      // Use managed Supabase instance
+      logger.debug('Using managed Supabase instance');
+
+      const supabase = createClient(managedSupabaseUrl, managedSupabaseServiceKey);
+      const result = await supabase.rpc('execute_sql', { sql: query });
+
+      if (result.error) {
+        return new Response(
+          JSON.stringify({
+            error: {
+              message: result.error.message,
+              details: result.error,
+            },
+          }),
+          {
+            status: 400,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          },
+        );
+      }
+
+      return new Response(JSON.stringify(result), {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+
+    // Fallback to user-provided Supabase (existing logic)
+    const authHeader = request.headers.get('Authorization');
+
+    if (!authHeader) {
+      return new Response('No authorization token provided', { status: 401 });
+    }
 
     const response = await fetch(`https://api.supabase.com/v1/projects/${projectId}/database/query`, {
       method: 'POST',

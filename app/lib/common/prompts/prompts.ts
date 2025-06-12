@@ -11,7 +11,23 @@ export const getSystemPrompt = (
     credentials?: { anonKey?: string; supabaseUrl?: string };
   },
   designScheme?: DesignScheme,
-) => `
+) => {
+  // Check if we have managed Supabase (environment variables available)
+  const hasManagedSupabase = !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
+
+  // If managed Supabase is available, override the connection state
+  const effectiveSupabase = hasManagedSupabase
+    ? {
+        isConnected: true,
+        hasSelectedProject: true,
+        credentials: {
+          supabaseUrl: process.env.SUPABASE_URL,
+          anonKey: process.env.SUPABASE_ANON_KEY,
+        },
+      }
+    : supabase;
+
+  return `
 You are Bolt, an expert AI assistant and exceptional senior software developer with vast knowledge across multiple programming languages, frameworks, and best practices.
 
 <system_constraints>
@@ -76,24 +92,25 @@ You are Bolt, an expert AI assistant and exceptional senior software developer w
   The following instructions guide how you should handle database operations in projects.
 
   CRITICAL: Use Supabase for databases by default, unless specified otherwise.
-
   IMPORTANT NOTE: Supabase project setup and configuration is handled seperately by the user! ${
-    supabase
-      ? !supabase.isConnected
+    effectiveSupabase
+      ? !effectiveSupabase.isConnected
         ? 'You are not connected to Supabase. Remind the user to "connect to Supabase in the chat box before proceeding with database operations".'
-        : !supabase.hasSelectedProject
+        : !effectiveSupabase.hasSelectedProject
           ? 'Remind the user "You are connected to Supabase but no project is selected. Remind the user to select a project in the chat box before proceeding with database operations".'
-          : ''
+          : hasManagedSupabase
+            ? 'Supabase is available and ready to use with managed configuration.'
+            : ''
       : ''
   } 
     IMPORTANT: Create a .env file if it doesnt exist${
-      supabase?.isConnected &&
-      supabase?.hasSelectedProject &&
-      supabase?.credentials?.supabaseUrl &&
-      supabase?.credentials?.anonKey
+      effectiveSupabase?.isConnected &&
+      effectiveSupabase?.hasSelectedProject &&
+      effectiveSupabase?.credentials?.supabaseUrl &&
+      effectiveSupabase?.credentials?.anonKey
         ? ` and include the following variables:
-    VITE_SUPABASE_URL=${supabase.credentials.supabaseUrl}
-    VITE_SUPABASE_ANON_KEY=${supabase.credentials.anonKey}`
+    VITE_SUPABASE_URL=${effectiveSupabase.credentials.supabaseUrl}
+    VITE_SUPABASE_ANON_KEY=${effectiveSupabase.credentials.anonKey}`
         : '.'
     }
   NEVER modify any Supabase configuration or \`.env\` files apart from creating the \`.env\`.
@@ -702,11 +719,11 @@ Here are some examples of correct usage of artifacts:
         <boltAction type="start">npm run dev</boltAction>
       </boltArtifact>
 
-      You can now view the bouncing ball animation in the preview. The ball will start falling from the top of the screen and bounce realistically when it hits the bottom.
-    </assistant_response>
+      You can now view the bouncing ball animation in the preview. The ball will start falling from the top of the screen and bounce realistically when it hits the bottom.    </assistant_response>
   </example>
 </examples>
 `;
+};
 
 export const CONTINUE_PROMPT = stripIndents`
   Continue your prior response. IMPORTANT: Immediately begin from where you left off without any interruptions.

@@ -1,5 +1,6 @@
 import { atom } from 'nanostores';
 import type { SupabaseUser, SupabaseStats, SupabaseApiKey, SupabaseCredentials } from '~/types/supabase';
+import { HAS_MANAGED_SUPABASE } from '~/lib/supabase/managed-client';
 
 export interface SupabaseProject {
   id: string;
@@ -24,23 +25,47 @@ export interface SupabaseConnectionState {
   isConnected?: boolean;
   project?: SupabaseProject;
   credentials?: SupabaseCredentials;
+  managedInstance?: boolean;
 }
 
 const savedConnection = typeof localStorage !== 'undefined' ? localStorage.getItem('supabase_connection') : null;
 const savedCredentials = typeof localStorage !== 'undefined' ? localStorage.getItem('supabaseCredentials') : null;
 
-const initialState: SupabaseConnectionState = savedConnection
-  ? JSON.parse(savedConnection)
-  : {
-      user: null,
-      token: '',
+// If we have managed Supabase, set up initial state differently
+const initialState: SupabaseConnectionState = HAS_MANAGED_SUPABASE
+  ? {
+      user: { email: 'Managed User', role: 'Admin', id: 'managed', created_at: '', last_sign_in_at: '' },
+      token: 'managed-token',
       stats: undefined,
-      selectedProjectId: undefined,
-      isConnected: false,
-      project: undefined,
-    };
+      selectedProjectId: 'managed',
+      isConnected: true,
+      project: {
+        id: 'managed',
+        name: 'Managed Supabase Instance',
+        region: 'managed',
+        organization_id: 'managed',
+        status: 'active',
+        created_at: new Date().toISOString(),
+      },
+      credentials: {
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
+        anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+      },
+      managedInstance: true,
+    }
+  : savedConnection
+    ? JSON.parse(savedConnection)
+    : {
+        user: null,
+        token: '',
+        stats: undefined,
+        selectedProjectId: undefined,
+        isConnected: false,
+        project: undefined,
+        managedInstance: false,
+      };
 
-if (savedCredentials && !initialState.credentials) {
+if (!HAS_MANAGED_SUPABASE && savedCredentials && !initialState.credentials) {
   try {
     initialState.credentials = JSON.parse(savedCredentials);
   } catch (e) {
@@ -50,7 +75,8 @@ if (savedCredentials && !initialState.credentials) {
 
 export const supabaseConnection = atom<SupabaseConnectionState>(initialState);
 
-if (initialState.token && !initialState.stats) {
+// Only fetch stats if not using managed instance
+if (!HAS_MANAGED_SUPABASE && initialState.token && !initialState.stats) {
   fetchSupabaseStats(initialState.token).catch(console.error);
 }
 
@@ -60,6 +86,11 @@ export const isFetchingApiKeys = atom(false);
 
 export function updateSupabaseConnection(connection: Partial<SupabaseConnectionState>) {
   const currentState = supabaseConnection.get();
+
+  // Skip updates if we're using managed instance and trying to override it
+  if (HAS_MANAGED_SUPABASE && currentState.managedInstance && !connection.managedInstance) {
+    return;
+  }
 
   if (connection.user !== undefined || connection.token !== undefined) {
     const newUser = connection.user !== undefined ? connection.user : currentState.user;
@@ -95,9 +126,12 @@ export function updateSupabaseConnection(connection: Partial<SupabaseConnectionS
   supabaseConnection.set(newState);
 
   /*
-   * Always save the connection state to localStorage to persist across chats
+   * Only save to localStorage if not using managed instance
    */
-  if (connection.user || connection.token || connection.selectedProjectId !== undefined || connection.credentials) {
+  if (
+    !HAS_MANAGED_SUPABASE &&
+    (connection.user || connection.token || connection.selectedProjectId !== undefined || connection.credentials)
+  ) {
     localStorage.setItem('supabase_connection', JSON.stringify(newState));
 
     if (newState.credentials) {
@@ -105,13 +139,18 @@ export function updateSupabaseConnection(connection: Partial<SupabaseConnectionS
     } else {
       localStorage.removeItem('supabaseCredentials');
     }
-  } else {
+  } else if (!HAS_MANAGED_SUPABASE) {
     localStorage.removeItem('supabase_connection');
     localStorage.removeItem('supabaseCredentials');
   }
 }
 
 export async function fetchSupabaseStats(token: string) {
+  // Skip if using managed instance
+  if (HAS_MANAGED_SUPABASE) {
+    return;
+  }
+
   isFetchingStats.set(true);
 
   try {
@@ -145,6 +184,11 @@ export async function fetchSupabaseStats(token: string) {
 }
 
 export async function fetchProjectApiKeys(projectId: string, token: string) {
+  // Skip if using managed instance
+  if (HAS_MANAGED_SUPABASE) {
+    return null;
+  }
+
   isFetchingApiKeys.set(true);
 
   try {

@@ -5,6 +5,7 @@ import { useStore } from '@nanostores/react';
 import { chatId } from '~/lib/persistence/useChatHistory';
 import { fetchSupabaseStats } from '~/lib/stores/supabase';
 import { Dialog, DialogRoot, DialogClose, DialogTitle, DialogButton } from '~/components/ui/Dialog';
+import { HAS_MANAGED_SUPABASE } from '~/lib/supabase/managed-client';
 
 export function SupabaseConnection() {
   const {
@@ -25,6 +26,11 @@ export function SupabaseConnection() {
   } = useSupabaseConnection();
 
   const currentChatId = useStore(chatId);
+
+  // If we're using the managed instance, don't show the connection UI
+  if (HAS_MANAGED_SUPABASE || supabaseConn.managedInstance) {
+    return null;
+  }
 
   useEffect(() => {
     const handleOpenConnectionDialog = () => {

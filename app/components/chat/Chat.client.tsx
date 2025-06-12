@@ -27,6 +27,7 @@ import { logStore } from '~/lib/stores/logs';
 import { streamingState } from '~/lib/stores/streaming';
 import { filesToArtifacts } from '~/utils/fileUtils';
 import { supabaseConnection } from '~/lib/stores/supabase';
+import { HAS_MANAGED_SUPABASE } from '~/lib/supabase/managed-client';
 import { defaultDesignScheme, type DesignScheme } from '~/types/design-scheme';
 import type { ElementInfo } from '~/components/workbench/Inspector';
 
@@ -171,12 +172,17 @@ export const ChatImpl = memo(
         chatMode,
         designScheme,
         supabase: {
-          isConnected: supabaseConn.isConnected,
-          hasSelectedProject: !!selectedProject,
-          credentials: {
-            supabaseUrl: supabaseConn?.credentials?.supabaseUrl,
-            anonKey: supabaseConn?.credentials?.anonKey,
-          },
+          isConnected: HAS_MANAGED_SUPABASE || supabaseConn.isConnected,
+          hasSelectedProject: HAS_MANAGED_SUPABASE || !!selectedProject,
+          credentials: HAS_MANAGED_SUPABASE
+            ? {
+                supabaseUrl: import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL,
+                anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY,
+              }
+            : {
+                supabaseUrl: supabaseConn?.credentials?.supabaseUrl,
+                anonKey: supabaseConn?.credentials?.anonKey,
+              },
         },
       },
       sendExtraMessageFields: true,
