@@ -98,6 +98,15 @@ export default defineConfig((config) => {
         // Remove the output.manualChunks configuration
       },
     },
+    server: {
+      host: '0.0.0.0', // Allow external connections
+      port: parseInt(process.env.PORT || '8080'),
+      allowedHosts: [
+        'localhost',
+        '.run.app', // Allow all Google Cloud Run domains
+        'bolt-diy1-894533648931.europe-west1.run.app', // Your specific domain
+      ],
+    },
     plugins: [
       nodePolyfills({
         include: ['buffer', 'process', 'util', 'stream'],
