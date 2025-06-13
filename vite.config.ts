@@ -93,13 +93,9 @@ export default defineConfig((config) => {
     },
     build: {
       target: 'esnext',
+      // Remove rollupOptions completely or simplify it
       rollupOptions: {
-        output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            editor: ['@codemirror/state', '@codemirror/view', '@codemirror/commands'],
-          },
-        },
+        // Remove the output.manualChunks configuration
       },
     },
     plugins: [
