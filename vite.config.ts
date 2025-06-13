@@ -93,6 +93,14 @@ export default defineConfig((config) => {
     },
     build: {
       target: 'esnext',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom'],
+            editor: ['@codemirror/state', '@codemirror/view', '@codemirror/commands'],
+          },
+        },
+      },
     },
     plugins: [
       nodePolyfills({
