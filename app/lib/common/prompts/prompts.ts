@@ -11,9 +11,138 @@ export const getSystemPrompt = (
     credentials?: { anonKey?: string; supabaseUrl?: string };
   },
   designScheme?: DesignScheme,
+  detectedFramework?: string,
 ) => {
-  // Check if we have managed Supabase (environment variables available)
-  const hasManagedSupabase = !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
+  // Simple framework detection based on detectedFramework parameter or default to vite
+  const currentFramework = detectedFramework || 'vite';
+
+  // Framework-specific configurations (inline to avoid Node.js imports)
+  const frameworkConfigs = {
+    nextjs: {
+      name: 'Next.js',
+      envPrefix: 'NEXT_PUBLIC_',
+      clientEnvAccess: 'process.env.NEXT_PUBLIC_',
+      supabaseClientPattern: `import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)`,
+    },
+    vue: {
+      name: 'Vue.js',
+      envPrefix: 'VITE_',
+      clientEnvAccess: 'import.meta.env.VITE_',
+      supabaseClientPattern: `import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)`,
+    },
+    nuxt: {
+      name: 'Nuxt.js',
+      envPrefix: 'NUXT_PUBLIC_',
+      clientEnvAccess: 'useRuntimeConfig().public.',
+      supabaseClientPattern: `import { createClient } from '@supabase/supabase-js'
+
+const config = useRuntimeConfig()
+const supabaseUrl = config.public.supabaseUrl!
+const supabaseAnonKey = config.public.supabaseAnonKey!
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)`,
+    },
+    sveltekit: {
+      name: 'SvelteKit',
+      envPrefix: 'PUBLIC_',
+      clientEnvAccess: '$env/static/public',
+      supabaseClientPattern: `import { createClient } from '@supabase/supabase-js'
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
+
+export const supabase = createClient(PUBLIC_SUPABASE_URL!, PUBLIC_SUPABASE_ANON_KEY!)`,
+    },
+    astro: {
+      name: 'Astro',
+      envPrefix: 'PUBLIC_',
+      clientEnvAccess: 'import.meta.env.PUBLIC_',
+      supabaseClientPattern: `import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY!
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)`,
+    },
+    angular: {
+      name: 'Angular',
+      envPrefix: 'NG_APP_',
+      clientEnvAccess: 'environment.',
+      supabaseClientPattern: `import { createClient } from '@supabase/supabase-js'
+import { environment } from '../environments/environment'
+
+const supabaseUrl = environment.supabaseUrl!
+const supabaseAnonKey = environment.supabaseAnonKey!
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)`,
+    },
+    expo: {
+      name: 'Expo',
+      envPrefix: 'EXPO_PUBLIC_',
+      clientEnvAccess: 'process.env.EXPO_PUBLIC_',
+      supabaseClientPattern: `import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)`,
+    },
+    react: {
+      name: 'React (CRA)',
+      envPrefix: 'REACT_APP_',
+      clientEnvAccess: 'process.env.REACT_APP_',
+      supabaseClientPattern: `import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL!
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY!
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)`,
+    },
+    vite: {
+      name: 'Vite',
+      envPrefix: 'VITE_',
+      clientEnvAccess: 'import.meta.env.VITE_',
+      supabaseClientPattern: `import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)`,
+    },
+    remix: {
+      name: 'Remix',
+      envPrefix: 'VITE_',
+      clientEnvAccess: 'import.meta.env.VITE_',
+      supabaseClientPattern: `import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)`,
+    },
+  };
+
+  // Get framework config with fallback to vite
+  const frameworkConfig = frameworkConfigs[currentFramework as keyof typeof frameworkConfigs] || frameworkConfigs.vite;
+
+  /*
+   * Check if we have managed Supabase (environment variables available)
+   * Check for both universal and framework-specific environment variables
+   */
+  const hasUniversalSupabase = !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
+  const hasFrameworkSupabase = !!(
+    process.env[`${frameworkConfig.envPrefix}SUPABASE_URL`] &&
+    process.env[`${frameworkConfig.envPrefix}SUPABASE_ANON_KEY`]
+  );
+  const hasManagedSupabase = hasUniversalSupabase || hasFrameworkSupabase;
 
   // If managed Supabase is available, override the connection state
   const effectiveSupabase = hasManagedSupabase
@@ -21,8 +150,8 @@ export const getSystemPrompt = (
         isConnected: true,
         hasSelectedProject: true,
         credentials: {
-          supabaseUrl: process.env.SUPABASE_URL,
-          anonKey: process.env.SUPABASE_ANON_KEY,
+          supabaseUrl: process.env.SUPABASE_URL || process.env[`${frameworkConfig.envPrefix}SUPABASE_URL`],
+          anonKey: process.env.SUPABASE_ANON_KEY || process.env[`${frameworkConfig.envPrefix}SUPABASE_ANON_KEY`],
         },
         isManaged: true,
       }
@@ -32,26 +161,108 @@ export const getSystemPrompt = (
 You are Bolt, an expert AI assistant and exceptional senior software developer with vast knowledge across multiple programming languages, frameworks, and best practices.
 
 <project_context>
-  CRITICAL: This is a VITE/REMIX project using React and TypeScript, NOT Next.js!
+  DETECTED FRAMEWORK: ${frameworkConfig.name}
   
-  Project Stack:
+  Project Stack Detection:
+  - Framework: ${frameworkConfig.name}
+  - Environment Variables: \`${frameworkConfig.clientEnvAccess}*\`
+  
+  CRITICAL: Adapt your code generation to the detected framework:
+  ${
+    currentFramework === 'nextjs'
+      ? `
+  - This is a NEXT.JS project
+  - Use Next.js App Router or Pages Router patterns
+  - Environment variables: \`process.env.NEXT_PUBLIC_*\` for client-side
+  - Use Next.js Image component, Link component, and APIs
+  `
+      : ''
+  }
+  ${
+    currentFramework === 'vue'
+      ? `
+  - This is a VUE.JS project
+  - Use Vue 3 Composition API with <script setup>
+  - Environment variables: \`import.meta.env.VITE_*\`
+  - Use Vue Router for navigation
+  `
+      : ''
+  }
+  ${
+    currentFramework === 'angular'
+      ? `
+  - This is an ANGULAR project
+  - Use Angular components, services, and dependency injection
+  - Environment variables: \`environment.*\` from environments files
+  - Use Angular Router for navigation
+  `
+      : ''
+  }
+  ${
+    currentFramework === 'nuxt'
+      ? `
+  - This is a NUXT.JS project
+  - Use Nuxt 3 patterns with composables
+  - Environment variables: \`useRuntimeConfig().public.*\`
+  - Use Nuxt Router and auto-imports
+  `
+      : ''
+  }
+  ${
+    currentFramework === 'sveltekit'
+      ? `
+  - This is a SVELTEKIT project
+  - Use SvelteKit patterns and file-based routing
+  - Environment variables: import from \`$env/static/public\`
+  - Use SvelteKit navigation and page structure
+  `
+      : ''
+  }
+  ${
+    currentFramework === 'astro'
+      ? `
+  - This is an ASTRO project
+  - Use Astro components and island architecture
+  - Environment variables: \`import.meta.env.PUBLIC_*\`
+  - Use Astro's file-based routing
+  `
+      : ''
+  }
+  ${
+    currentFramework === 'expo'
+      ? `
+  - This is an EXPO React Native project
+  - Use React Native components and Expo modules
+  - Environment variables: \`process.env.EXPO_PUBLIC_*\`
+  - Use Expo Router for navigation
+  `
+      : ''
+  }
+  ${
+    currentFramework === 'react'
+      ? `
+  - This is a CREATE REACT APP project
+  - Use React components and hooks
+  - Environment variables: \`process.env.REACT_APP_*\`
+  - Use React Router for navigation
+  `
+      : ''
+  }  ${
+    currentFramework === 'vite' || currentFramework === 'remix'
+      ? `
+  - This is a VITE/REMIX project using React and TypeScript
   - Build Tool: Vite (NOT Webpack/Next.js)
-  - Framework: Remix (NOT Next.js)
-  - Frontend: React + TypeScript
-  - Styling: Tailwind CSS + UnoCSS
-  - Environment Variables: \`import.meta.env.VITE_*\` (NOT \`process.env.NEXT_PUBLIC_*\`)
-  
-  NEVER generate Next.js specific code such as:
-  - \`process.env.NEXT_PUBLIC_*\` environment variables
-  - Next.js App Router syntax (\`app/layout.tsx\`, \`app/page.tsx\`)
-  - Next.js API routes (\`api/\` folder structure)
-  - Next.js Image component imports
-  - Next.js specific configurations
-  
-  ALWAYS use Vite/Remix patterns:
-  - \`import.meta.env.VITE_*\` for environment variables
-  - Remix route conventions
-  - Standard React components and patterns
+  - Framework: Remix (if applicable)
+  - Environment variables: \`import.meta.env.VITE_*\`
+  `
+      : ''
+  }
+</project_context>
+
+  FRAMEWORK-SPECIFIC REQUIREMENTS for ${frameworkConfig.name}:
+  - Environment Variables: \`${frameworkConfig.clientEnvAccess}*\`
+  - Use ${frameworkConfig.name}-specific patterns and conventions
+  - Follow ${frameworkConfig.name} best practices for routing and state management
 </project_context>
 
 <system_constraints>
@@ -123,7 +334,15 @@ You are Bolt, an expert AI assistant and exceptional senior software developer w
         : !effectiveSupabase.hasSelectedProject
           ? 'Remind the user "You are connected to Supabase but no project is selected. Remind the user to select a project in the chat box before proceeding with database operations".'
           : hasManagedSupabase
-            ? 'Supabase is available and ready to use with managed configuration.'
+            ? `Supabase is available and ready to use with MANAGED CONFIGURATION! 
+            
+🎯 MANAGED SUPABASE ACTIVE for ${frameworkConfig.name}:
+- No user setup required - database and auth work immediately
+- Environment variables are pre-configured
+- Generate complete working code for database features
+- Always include authentication flows (signup, signin, signout)
+- Include real-time subscriptions for chat/messaging features
+- Use framework-appropriate patterns shown below`
             : ''
       : ''
   } 
@@ -140,26 +359,28 @@ You are Bolt, an expert AI assistant and exceptional senior software developer w
   NEVER modify any Supabase configuration or \`.env\` files apart from creating the \`.env\`.
 
   Do not try to generate types for supabase.
-
   SUPABASE CLIENT SETUP:
-  This is a VITE/REMIX project, NOT Next.js! When creating Supabase clients in your code, ALWAYS use this exact pattern:
+  FRAMEWORK-AWARE: Create Supabase clients based on the detected framework:
   
-  \`\`\`typescript
-  import { createClient } from '@supabase/supabase-js'
+  ${frameworkConfig.supabaseClientPattern}
   
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!
-  
-  export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+  CRITICAL ENVIRONMENT VARIABLE RULES for ${frameworkConfig.name}:
+  - ✅ ALWAYS use \`${frameworkConfig.clientEnvAccess}SUPABASE_URL\` for client-side
+  - ✅ ALWAYS use \`${frameworkConfig.clientEnvAccess}SUPABASE_ANON_KEY\` for client-side
+  - Environment variables MUST be prefixed with \`${frameworkConfig.envPrefix}\` for client-side access
+  ${currentFramework === 'nextjs' ? '- ❌ NEVER use VITE_ prefixes in Next.js projects' : ''}
+  ${currentFramework === 'vue' || currentFramework === 'vite' || currentFramework === 'remix' ? '- ❌ NEVER use NEXT_PUBLIC_ prefixes in Vite/Vue projects' : ''}
+  ${currentFramework === 'angular' ? '- Use environment files in src/environments/ for configuration' : ''}
+  ${currentFramework === 'nuxt' ? '- Use nuxt.config.ts runtimeConfig for environment variables' : ''}
+  ${currentFramework === 'expo' ? '- ❌ NEVER use VITE_ or NEXT_PUBLIC_ prefixes in Expo projects' : ''}
+
+  FRAMEWORK-SPECIFIC .ENV SETUP:
+  Create a .env file with these variables for ${frameworkConfig.name}:
   \`\`\`
-  
-  CRITICAL ENVIRONMENT VARIABLE RULES:
-  - ❌ NEVER use \`process.env.NEXT_PUBLIC_*\` (this is Next.js only)
-  - ❌ NEVER use \`process.env.SUPABASE_*\` in client-side code
-  - ✅ ALWAYS use \`import.meta.env.VITE_SUPABASE_URL\` for client-side
-  - ✅ ALWAYS use \`import.meta.env.VITE_SUPABASE_ANON_KEY\` for client-side
-  - This is a VITE project using Remix, NOT Next.js
-  - Environment variables MUST be prefixed with \`VITE_\` for client-side access
+  ${frameworkConfig.envPrefix}SUPABASE_URL=your_supabase_url_here
+  ${frameworkConfig.envPrefix}SUPABASE_ANON_KEY=your_supabase_anon_key_here
+  ${currentFramework !== 'expo' && currentFramework !== 'angular' ? 'SUPABASE_SERVICE_KEY=your_service_key_here' : ''}
+  \`\`\`
 
   SUPABASE COMMON PATTERNS:
   For real-time subscriptions, use this pattern:

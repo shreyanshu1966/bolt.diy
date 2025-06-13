@@ -11,6 +11,79 @@ import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
 
+// Framework detection function
+function detectFramework() {
+  const cwd = process.cwd();
+  
+  // Check for Next.js
+  if (fs.existsSync(path.join(cwd, 'next.config.js')) || 
+      fs.existsSync(path.join(cwd, 'next.config.mjs')) ||
+      fs.existsSync(path.join(cwd, 'next.config.ts'))) {
+    return {
+      name: 'Next.js',
+      envVars: {
+        url: 'NEXT_PUBLIC_SUPABASE_URL',
+        anonKey: 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
+      }
+    };
+  }
+  
+  // Check for Nuxt
+  if (fs.existsSync(path.join(cwd, 'nuxt.config.js')) || 
+      fs.existsSync(path.join(cwd, 'nuxt.config.ts'))) {
+    return {
+      name: 'Nuxt',
+      envVars: {
+        url: 'NUXT_SUPABASE_URL',
+        anonKey: 'NUXT_SUPABASE_ANON_KEY'
+      }
+    };
+  }
+  
+  // Check for SvelteKit
+  if (fs.existsSync(path.join(cwd, 'svelte.config.js'))) {
+    return {
+      name: 'SvelteKit',
+      envVars: {
+        url: 'PUBLIC_SUPABASE_URL',
+        anonKey: 'PUBLIC_SUPABASE_ANON_KEY'
+      }
+    };
+  }
+  
+  // Check for Astro
+  if (fs.existsSync(path.join(cwd, 'astro.config.mjs')) || 
+      fs.existsSync(path.join(cwd, 'astro.config.js'))) {
+    return {
+      name: 'Astro',
+      envVars: {
+        url: 'PUBLIC_SUPABASE_URL',
+        anonKey: 'PUBLIC_SUPABASE_ANON_KEY'
+      }
+    };
+  }
+  
+  // Check for Angular
+  if (fs.existsSync(path.join(cwd, 'angular.json'))) {
+    return {
+      name: 'Angular',
+      envVars: {
+        url: 'NG_APP_SUPABASE_URL',
+        anonKey: 'NG_APP_SUPABASE_ANON_KEY'
+      }
+    };
+  }
+  
+  // Default to Vite/Remix
+  return {
+    name: 'Vite/Remix',
+    envVars: {
+      url: 'VITE_SUPABASE_URL',
+      anonKey: 'VITE_SUPABASE_ANON_KEY'
+    }
+  };
+}
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
@@ -55,8 +128,11 @@ async function setupManagedSupabase() {
     console.log('\n❌ Error: Invalid Supabase URL format!');
     process.exit(1);
   }
+  // Detect project framework
+  const frameworkConfig = detectFramework();
+  console.log(`\n🔍 Detected framework: ${frameworkConfig.name}`);
 
-  // Update environment variables
+  // Update environment variables with framework-specific prefixes
   const supabaseConfig = `
 # Managed Supabase Configuration (for fully managed experience)
 SUPABASE_URL=${supabaseUrl}
@@ -64,9 +140,9 @@ SUPABASE_ANON_KEY=${anonKey}
 SUPABASE_SERVICE_KEY=${serviceKey}
 ENABLE_MANAGED_SUPABASE=true
 
-# Frontend variables (for client-side access)
-VITE_SUPABASE_URL=${supabaseUrl}
-VITE_SUPABASE_ANON_KEY=${anonKey}
+# Framework-specific variables (for client-side access)
+${frameworkConfig.envVars.url}=${supabaseUrl}
+${frameworkConfig.envVars.anonKey}=${anonKey}
 `;
 
   // Remove existing Supabase config if present
@@ -77,7 +153,13 @@ VITE_SUPABASE_ANON_KEY=${anonKey}
     .replace(/SUPABASE_SERVICE_KEY=.*\n/g, '')
     .replace(/ENABLE_MANAGED_SUPABASE=.*\n/g, '')
     .replace(/VITE_SUPABASE_URL=.*\n/g, '')
-    .replace(/VITE_SUPABASE_ANON_KEY=.*\n/g, '');
+    .replace(/VITE_SUPABASE_ANON_KEY=.*\n/g, '')
+    .replace(/NEXT_PUBLIC_SUPABASE_URL=.*\n/g, '')
+    .replace(/NEXT_PUBLIC_SUPABASE_ANON_KEY=.*\n/g, '')
+    .replace(/NUXT_SUPABASE_URL=.*\n/g, '')
+    .replace(/NUXT_SUPABASE_ANON_KEY=.*\n/g, '')
+    .replace(/PUBLIC_SUPABASE_URL=.*\n/g, '')
+    .replace(/PUBLIC_SUPABASE_ANON_KEY=.*\n/g, '');
 
   // Add new configuration
   envContent += supabaseConfig;
