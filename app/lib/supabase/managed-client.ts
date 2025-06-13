@@ -3,77 +3,9 @@ import { createScopedLogger } from '~/utils/logger';
 
 const logger = createScopedLogger('managed-supabase');
 
-// Framework-agnostic environment variable detection
-function getEnvVar(name: string): string {
-  // All possible environment variable names for Supabase across frameworks
-  const possibleNames = [
-    name, // Universal name (e.g., SUPABASE_URL)
-    `VITE_${name}`, // Vite, Vue, Remix
-    `NEXT_PUBLIC_${name}`, // Next.js
-    `NUXT_PUBLIC_${name}`, // Nuxt
-    `PUBLIC_${name}`, // SvelteKit, Astro
-    `REACT_APP_${name}`, // Create React App
-    `EXPO_PUBLIC_${name}`, // Expo
-    `NG_APP_${name}`, // Angular
-  ];
-
-  // For client-side (browser)
-  if (typeof window !== 'undefined') {
-    // Check window.import.meta.env (Vite in browser)
-    if ((window as any).import?.meta?.env) {
-      for (const envName of possibleNames) {
-        const value = (window as any).import.meta.env[envName];
-
-        if (value) {
-          return value;
-        }
-      }
-    }
-
-    // Check process.env if available in browser (bundled environment)
-    if (typeof process !== 'undefined' && process.env) {
-      for (const envName of possibleNames) {
-        const value = process.env[envName];
-
-        if (value) {
-          return value;
-        }
-      }
-    }
-  }
-
-  // For Node.js environments (server-side)
-  if (typeof process !== 'undefined' && process.env) {
-    for (const envName of possibleNames) {
-      const value = process.env[envName];
-
-      if (value) {
-        return value;
-      }
-    }
-  }
-
-  // For ES modules with import.meta.env (Vite, Astro)
-  try {
-    if (import.meta && (import.meta as any).env) {
-      for (const envName of possibleNames) {
-        const value = (import.meta as any).env[envName];
-
-        if (value) {
-          return value;
-        }
-      }
-    }
-  } catch {
-    // import.meta not available, continue
-  }
-
-  return '';
-}
-
 // These values should be set in your environment variables
-const SUPABASE_URL = getEnvVar('SUPABASE_URL');
-const SUPABASE_ANON_KEY = getEnvVar('SUPABASE_ANON_KEY');
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
 
 // Check if we have managed Supabase credentials
 export const HAS_MANAGED_SUPABASE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
