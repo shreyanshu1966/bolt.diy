@@ -82,18 +82,42 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 import { logStore } from './lib/stores/logs';
+import { useAnalyticsBridge } from './lib/hooks/useAnalyticsBridge';
+import { analytics } from './lib/middleware/analyticsMiddleware';
 
 export default function App() {
   const theme = useStore(themeStore);
 
+  // Initialize the analytics bridge to store events in the time series database
+  const { isEnabled } = useAnalyticsBridge({ enabled: true });
+
   useEffect(() => {
+    // Log application initialization
     logStore.logSystem('Application initialized', {
       theme,
       platform: navigator.platform,
       userAgent: navigator.userAgent,
       timestamp: new Date().toISOString(),
     });
-  }, []);
+
+    // Track application initialization in analytics
+    analytics.trackEvent({
+      event: 'app_initialized',
+      category: 'system',
+      action: 'initialize',
+      label: 'Bolt application',
+      properties: {
+        theme,
+        platform: navigator.platform,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    // Log analytics status
+    if (isEnabled) {
+      logStore.logSystem('Analytics bridge enabled - events will be stored in time series database');
+    }
+  }, [theme, isEnabled]);
 
   return (
     <Layout>

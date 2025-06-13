@@ -34,6 +34,7 @@ ARG TOGETHER_API_BASE_URL
 ARG AWS_BEDROCK_CONFIG
 ARG VITE_LOG_LEVEL=debug
 ARG DEFAULT_NUM_CTX
+ARG PORT=5173
 
 ENV WRANGLER_SEND_METRICS=false \
     GROQ_API_KEY=${GROQ_API_KEY} \
@@ -57,7 +58,7 @@ RUN mkdir -p /root/.config/.wrangler && \
 
 RUN pnpm run build
 
-CMD [ "pnpm", "run", "dockerstart"]
+CMD [ "pnpm", "run", "dockerstart", "--port", "$PORT" ]
 
 # Development image
 FROM base AS bolt-ai-development
@@ -75,6 +76,7 @@ ARG TOGETHER_API_KEY
 ARG TOGETHER_API_BASE_URL
 ARG VITE_LOG_LEVEL=debug
 ARG DEFAULT_NUM_CTX
+ARG PORT=5173
 
 ENV GROQ_API_KEY=${GROQ_API_KEY} \
     HuggingFace_API_KEY=${HuggingFace_API_KEY} \
@@ -92,4 +94,4 @@ ENV GROQ_API_KEY=${GROQ_API_KEY} \
     RUNNING_IN_DOCKER=true
 
 RUN mkdir -p ${WORKDIR}/run
-CMD pnpm run dev --host
+CMD pnpm run dev --host --port $PORT

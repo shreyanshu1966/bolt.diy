@@ -7,8 +7,10 @@ import { useDataOperations } from '~/lib/hooks/useDataOperations';
 import { openDatabase } from '~/lib/persistence/db';
 import { getAllChats, type Chat } from '~/lib/persistence/chats';
 import { DataVisualization } from './DataVisualization';
+import { TimeSeriesDashboard } from './TimeSeriesDashboard';
 import { classNames } from '~/utils/classNames';
 import { toast } from 'react-toastify';
+import { useManagedSupabase } from '~/lib/hooks/useManagedSupabase';
 
 // Create a custom hook to connect to the boltHistory database
 function useBoltHistoryDB() {
@@ -89,6 +91,7 @@ export function DataTab() {
   // State for settings categories and available chats
   const [settingsCategories] = useState<SettingsCategory[]>([
     { id: 'core', label: 'Core Settings', description: 'User profile and main settings' },
+    { id: 'analytics', label: 'Analytics', description: 'View time series data visualizations' },
     { id: 'providers', label: 'Providers', description: 'API keys and provider configurations' },
     { id: 'features', label: 'Features', description: 'Feature flags and settings' },
     { id: 'ui', label: 'UI', description: 'UI configuration and preferences' },
@@ -96,6 +99,8 @@ export function DataTab() {
     { id: 'debug', label: 'Debug', description: 'Debug settings and logs' },
     { id: 'updates', label: 'Updates', description: 'Update settings and notifications' },
   ]);
+
+  const { isConnected: isSupabaseConnected } = useManagedSupabase();
 
   const [availableChats, setAvailableChats] = useState<ExtendedChat[]>([]);
   const [chatItems, setChatItems] = useState<ChatItem[]>([]);
@@ -716,6 +721,18 @@ export function DataTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Time Series Analytics */}
+      {isSupabaseConnected && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4 text-bolt-elements-textPrimary">Time Series Analytics</h2>
+          <Card>
+            <CardContent className="p-5">
+              <TimeSeriesDashboard />
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

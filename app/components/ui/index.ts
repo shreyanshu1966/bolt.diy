@@ -32,6 +32,7 @@ export * from './SearchInput';
 export * from './SearchResultItem';
 export * from './StatusIndicator';
 export * from './TabsWithSlider';
+export * from './TimeSeriesChart';
 
 // Tooltip components
 export { default as WithTooltip } from './Tooltip';
